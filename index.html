@@ -24,7 +24,7 @@ select option.done{background:#d9f7df;color:#087443;font-weight:700}
 .add{border:0;border-radius:12px;padding:10px 16px;background:#e9f1ff;color:#174ea6;font-weight:800;cursor:pointer}
 .count,.status{font-size:13px;color:#667085}
 .submit{width:100%;margin-top:22px;padding:15px;border:0;border-radius:14px;background:linear-gradient(135deg,#00a86b,#10aee8);color:#fff;font-size:17px;font-weight:900;cursor:pointer}
-.submit:disabled{opacity:.65}
+.submit:disabled{opacity:.65;cursor:not-allowed}.view-only{background:#f2f4f7!important;color:#667085!important}.view-note{display:none;margin-top:12px;padding:11px 13px;border-radius:10px;background:#eefbf2;color:#087443;font-size:13px;font-weight:700}
 .msg{display:none;margin-top:16px;padding:14px;border-radius:12px;font-weight:700;line-height:1.5}
 .success{display:block;background:#e8fff3;color:#087443;border:1px solid #b7efd2}
 .error{display:block;background:#fff0f0;color:#b42318;border:1px solid #f1b4b4}
@@ -231,56 +231,62 @@ function updateCount(){
   $("count").textContent=document.querySelectorAll(".roll-box").length+" boxes";
 }
 
-function resetValues(){
-  $("lastRoll").value="";
-  $("currentTotal").value="";
-
+function setViewMode(viewOnly){
+  var last=$("lastRoll"), total=$("currentTotal"), add=$("addBtn"), submit=$("submitBtn");
   var boxes=document.querySelectorAll(".roll-box");
-  for(var i=0;i<boxes.length;i++){
-    boxes[i].value="";
+  last.readOnly=viewOnly; total.readOnly=viewOnly;
+  if(viewOnly){
+    last.classList.add("view-only"); total.classList.add("view-only");
+    add.disabled=true; add.classList.add("view-only");
+    submit.disabled=true; submit.textContent="VIEW ONLY"; submit.classList.add("view-only");
+    for(var i=0;i<boxes.length;i++){boxes[i].readOnly=true;boxes[i].classList.add("view-only");}
+    $("viewNote").style.display="block";
+  }else{
+    last.classList.remove("view-only"); total.classList.remove("view-only");
+    add.disabled=false; add.classList.remove("view-only");
+    submit.disabled=false; submit.textContent="SUBMIT DETAILS"; submit.classList.remove("view-only");
+    for(var j=0;j<boxes.length;j++){boxes[j].readOnly=false;boxes[j].classList.remove("view-only");}
+    $("viewNote").style.display="none";
   }
-
-  $("status").textContent="";
 }
-
+function resetValues(){
+  $("lastRoll").value=""; $("currentTotal").value="";
+  var boxes=document.querySelectorAll(".roll-box");
+  for(var i=0;i<boxes.length;i++) boxes[i].value="";
+  $("status").textContent="";
+  setViewMode(false);
+}
+function clearEntireForm(){
+  $("std").value="";
+  $("className").innerHTML='<option value="">Select CLASS</option>';
+  $("className").disabled=true;
+  $("lastRoll").value=""; $("currentTotal").value="";
+  var boxes=document.querySelectorAll(".roll-box");
+  for(var i=0;i<boxes.length;i++) boxes[i].value="";
+  setViewMode(false);
+  $("status").textContent="";
+  hideMsg();
+}
 function loadExisting(){
   hideMsg();
-
-  var std=$("std").value;
-  var className=$("className").value;
-
+  var std=$("std").value, cls=$("className").value;
   resetValues();
-
-  if(!std || !className) return;
-
-  var data=getClassData(std,className);
-
+  if(!std || !cls) return;
+  var data=getClassData(std,cls);
   if(data && data.hasEntry){
-    $("lastRoll").value=data.lastRoll || "";
-    $("currentTotal").value=data.currentTotal || "";
-
-    var rolls=String(data.rolls||"").split(",");
-    var validRolls=[];
-
-    for(var i=0;i<rolls.length;i++){
-      if(rolls[i].trim()!=="") validRolls.push(rolls[i].trim());
+    $("lastRoll").value=data.lastRoll||"";
+    $("currentTotal").value=data.currentTotal||"";
+    var rolls=String(data.rolls||"").split(","), valid=[];
+    for(var i=0;i<rolls.length;i++) if(rolls[i].trim()!=="") valid.push(rolls[i].trim());
+    for(var j=0;j<valid.length;j++){
+      while(j>=document.querySelectorAll(".roll-box").length) addBox();
+      document.querySelectorAll(".roll-box")[j].value=valid[j];
     }
-
-    for(var j=0;j<validRolls.length;j++){
-      while(j>=document.querySelectorAll(".roll-box").length){
-        addBox();
-      }
-
-      document.querySelectorAll(".roll-box")[j].value=validRolls[j];
-    }
-
     updateCount();
-
-    $("status").textContent=
-      "આ CLASS માટે અગાઉની entry મળી છે. જરૂર હોય તો સુધારીને ફરી Submit કરી શકો છો.";
+    setViewMode(true);
+    $("status").textContent="આ CLASSની અગાઉની entry માત્ર જોવા માટે બતાવવામાં આવી છે.";
   }
 }
-
 function jsonp(params){
   return new Promise(function(resolve,reject){
 
@@ -370,6 +376,11 @@ $("submitBtn").addEventListener("click",async function(){
 
   var std=$("std").value;
   var className=$("className").value;
+  var existing=getClassData(std,className);
+  if(existing && existing.hasEntry){
+    showMsg("આ CLASSની entry પહેલેથી save છે. તે માત્ર જોઈ શકાય છે; edit કરી શકાતી નથી.","error");
+    return;
+  }
   var lastRoll=$("lastRoll").value.trim();
   var currentTotal=$("currentTotal").value.trim();
 
@@ -438,24 +449,17 @@ $("submitBtn").addEventListener("click",async function(){
       throw new Error(result && result.message ? result.message : "Save failed");
     }
 
-    // Do NOT store submitted values in browser cache.
-    // Re-read the Google Sheet so the server remains the source of truth.
     await refreshMaster();
 
-    $("std").value=std;
-    fillClass(className);
-
     showMsg(
-      "SUCCESS ✓ STD "+std+
-      " - CLASS "+className+
-      " ની entry save થઈ ગઈ. છેલ્લો Roll No.: "+lastRoll+
-      " | હાલની કુલ સંખ્યા: "+currentTotal+
-      " | છોડેલા Roll No.: "+(rolls.join(", ")||"None"),
+      "SUCCESS ✓ STD "+std+" - CLASS "+className+" ની entry successfully save થઈ ગઈ.",
       "success"
     );
+    $("status").textContent="Entry save થઈ ગઈ. Form હવે નવી entry માટે તૈયાર થશે.";
 
-    $("status").textContent=
-      "✓ Entry saved. આ CLASS હવે dropdownમાં green દેખાશે.";
+    setTimeout(function(){
+      clearEntireForm();
+    },1200);
 
   }catch(e){
     showMsg("Entry save થઈ નથી: "+e.message,"error");
