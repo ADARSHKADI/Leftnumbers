@@ -115,22 +115,8 @@ function hideMsg(){
   $("msg").style.display="none";
 }
 
-function loadCache(){
-  try{
-    var x=JSON.parse(localStorage.getItem("PMG_ROLL_MASTER_V3")||"null");
-    if(x && x.master) master=x.master;
-  }catch(e){}
-}
-
-function saveCache(){
-  try{
-    localStorage.setItem(
-      "PMG_ROLL_MASTER_V3",
-      JSON.stringify({master:master,savedAt:new Date().getTime()})
-    );
-  }catch(e){}
-}
-
+function loadCache(){}
+function saveCache(){}
 function fillStd(){
   var el=$("std");
   el.innerHTML='<option value="">Select STD</option>';
@@ -452,18 +438,10 @@ $("submitBtn").addEventListener("click",async function(){
       throw new Error(result && result.message ? result.message : "Save failed");
     }
 
-    var item=getClassData(std,className);
+    // Do NOT store submitted values in browser cache.
+    // Re-read the Google Sheet so the server remains the source of truth.
+    await refreshMaster();
 
-    if(item){
-      item.hasEntry=true;
-      item.lastRoll=lastRoll;
-      item.currentTotal=currentTotal;
-      item.rolls=rolls.join(",");
-    }
-
-    saveCache();
-
-    fillStd();
     $("std").value=std;
     fillClass(className);
 
@@ -487,7 +465,6 @@ $("submitBtn").addEventListener("click",async function(){
   }
 });
 
-loadCache();
 fillStd();
 createBoxes();
 
