@@ -63,12 +63,12 @@ select option.done{background:#d9f7df;color:#087443;font-weight:700}
 
 <div class="grid" style="margin-top:14px">
 <div class="field">
-<label>રજીસ્ટર મુજબ છેલ્લો રોલ નંબર</label>
-<input id="lastRoll" type="number" min="0" step="1" inputmode="numeric">
+<label>રજીસ્ટર મુજબ છેલ્લો રોલ નંબર <span style="color:#d92d20">*</span></label>
+<input id="lastRoll" type="number" required min="0" step="1" inputmode="numeric">
 </div>
 <div class="field">
-<label>વર્ગમાં હાલની કુલ સંખ્યા</label>
-<input id="currentTotal" type="number" min="0" step="1" inputmode="numeric">
+<label>વર્ગમાં હાલની કુલ સંખ્યા <span style="color:#d92d20">*</span></label>
+<input id="currentTotal" type="number" required min="0" step="1" inputmode="numeric">
 </div>
 </div>
 
@@ -117,6 +117,13 @@ function hideMsg(){
 
 function loadCache(){}
 function saveCache(){}
+function isEntryDone(item){
+  if(!item || typeof item!=="object") return false;
+  return String(item.lastRoll||"").trim()!=="" ||
+         String(item.rolls||"").trim()!=="" ||
+         String(item.currentTotal||"").trim()!=="";
+}
+
 function fillStd(){
   var el=$("std");
   el.innerHTML='<option value="">Select STD</option>';
@@ -132,7 +139,7 @@ function fillStd(){
     var list=master[s]||[];
 
     for(var i=0;i<list.length;i++){
-      if(typeof list[i]==="object" && list[i].hasEntry){
+      if(isEntryDone(list[i])){
         done=true;
         break;
       }
@@ -172,7 +179,7 @@ function fillClass(keep){
   for(var i=0;i<list.length;i++){
     var item=list[i];
     var name=typeof item==="string" ? item : item.className;
-    var done=typeof item==="object" && item.hasEntry;
+    var done=isEntryDone(item);
 
     var option=document.createElement("option");
     option.value=name;
@@ -273,7 +280,7 @@ function loadExisting(){
   resetValues();
   if(!std || !cls) return;
   var data=getClassData(std,cls);
-  if(data && data.hasEntry){
+  if(data && isEntryDone(data)){
     $("lastRoll").value=data.lastRoll||"";
     $("currentTotal").value=data.currentTotal||"";
     var rolls=String(data.rolls||"").split(","), valid=[];
@@ -377,8 +384,8 @@ $("submitBtn").addEventListener("click",async function(){
   var std=$("std").value;
   var className=$("className").value;
   var existing=getClassData(std,className);
-  if(existing && existing.hasEntry){
-    showMsg("આ CLASSની entry પહેલેથી save છે. તે માત્ર જોઈ શકાય છે; edit કરી શકાતી નથી.","error");
+  if(existing && isEntryDone(existing)){
+    showMsg("આ CLASSની entry પહેલેથી save છે. ; edit કરી શકાતી નથી.","error");
     return;
   }
   var lastRoll=$("lastRoll").value.trim();
@@ -391,7 +398,17 @@ $("submitBtn").addEventListener("click",async function(){
 
   if(lastRoll==="" || currentTotal===""){
     showMsg(
-      "રજીસ્ટર મુજબ છેલ્લો Roll Number અને વર્ગમાં હાલની કુલ સંખ્યા બંને ભરો.",
+      "રજીસ્ટર મુજબ છેલ્લો Roll Number અને વર્ગમાં હાલની કુલ સંખ્યા બંને ફરજિયાત છે.",
+      "error"
+    );
+    if(lastRoll==="") $("lastRoll").focus();
+    else $("currentTotal").focus();
+    return;
+  }
+
+  if(!/^\d+$/.test(lastRoll) || !/^\d+$/.test(currentTotal)){
+    showMsg(
+      "બંને ફરજિયાત fieldsમાં માત્ર સંખ્યા જ લખો.",
       "error"
     );
     return;
